@@ -1,64 +1,64 @@
+import os
 import logging
-import google.generativeai as genai
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+import google.generativeai as genai
 
-# --- Config ---
-TOKEN = '8516173625:AAH5SBhzFs2vSM-_JyoqMPQ6KTsi0Vn3ehs'
-CHANNEL_USERNAME = '@Gondarmarketlink1221' # ያንተ ቻናል ዩዘርኔም
-GEMINI_API_KEY = 'ያንተ_GEMINI_API_KEY_እዚህ_ይግባ' # ከላይ የወሰድከው ቁጥር
-
-# Gemini Setup
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
-
+# ሎግ ፋይል ለማየት (Debugging)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+# ሚስጥራዊ ቁልፎችን ከ Render Environment Variables መቀበል
+TOKEN = os.environ.get("TELEGRAM_TOKEN")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Gemini AI ማዋቀር
+genai.configure(api_key=GEMINI_KEY)
+model = genai.GenerativeModel('gemini-pro')
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    try:
-        member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-        if member.status in ['member', 'administrator', 'creator']:
-            await update.message.reply_text(f"Welcome {update.effective_user.first_name}! 👋\nአሁን ማንኛውንም የትምህርት ጥያቄ እዚህ መጠየቅ ትችላለህ። AI መልስ ይሰጥሃል።")
-        else:
-            keyboard = [[InlineKeyboardButton("Join Channel 📢", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")],
-                        [InlineKeyboardButton("✅ I Joined", callback_data='check_sub')]]
-            await update.message.reply_text("መጀመሪያ ቻናላችንን ይቀላቀሉ!", reply_markup=InlineKeyboardMarkup(keyboard))
-    except:
-        await update.message.reply_text("Error: Make sure the bot is Admin in your channel.")
-
-# ተማሪዎች ጥያቄ ሲጠይቁ በ AI የሚመልስ ክፍል
-async def handle_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_text = update.message.text
+    user_name = update.effective_user.first_name
+    welcome_text = f"ሰላም {user_name}! 👋\nእኔ አሸፋ ቴክ AI ቦት ነኝ። እንዴት ልረዳህ እችላለሁ?"
     
-    # መጀመሪያ ሰብስክራይብ ማድረጉን ቼክ እናደርጋለን
-    member = await context.bot.get_chat_member(chat_id=CHANNEL_USERNAME, user_id=user_id)
-    if member.status not in ['member', 'administrator', 'creator']:
-        await update.message.reply_text("ጥያቄ ለመጠየቅ መጀመሪያ ቻናሉን ይቀላቀሉ!")
-        return
+    keyboard = [[InlineKeyboardButton("ስለ እኔ እወቅ", callback_data='about')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if update.message:
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    else:
+        await update.callback_query.message.reply_text(welcome_text, reply_markup=reply_markup)
 
-    # ለተማሪው መልስ ማዘጋጀት
-    waiting_msg = await update.message.reply_text("Thinking... 🤔")
+async def handle_ai_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_text = update.message.text
+    waiting_msg = await update.message.reply_text("በማሰብ ላይ ነኝ... 🤔")
+    
     try:
+        # Gemini AI መልስ እንዲያመጣ ማድረግ
         response = model.generate_content(user_text)
         await waiting_msg.edit_text(response.text)
-    except:
-        await waiting_msg.edit_text("ይቅርታ፣ አሁን ላይ መልስ መስጠት አልቻልኩም። በኋላ ይሞክሩ።")
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        await waiting_msg.edit_text("ይቅርታ አሁን ላይ መልስ መስጠት አልቻልኩም። በኋላ ይሞክሩ።")
 
 async def button_click(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await start(query, context)
+    if query.data == 'about':
+        await query.message.reply_text("እኔ ለጎንደር ዩኒቨርሲቲ ተማሪዎች ፈተና እንዲያጠኑ የተሰራሁ AI ቦት ነኝ።")
 
 def main():
+    if not TOKEN:
+        print("Error: TELEGRAM_TOKEN አልተገኘም!")
+        return
+
+    # ቦቱን መገንባት
     app = Application.builder().token(TOKEN).build()
+
+    # ትዕዛዞችን ማገናኘት
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_click))
-    # ጽሁፍ ሲላክ ወደ AI የሚወስድ መስመር
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ai_chat))
-    
-    print("--- AI Bot is Running! ---")
+
+    print("--- AI Bot is Running on Server! ---")
     app.run_polling()
 
 if __name__ == '__main__':
