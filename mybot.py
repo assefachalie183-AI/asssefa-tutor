@@ -17,7 +17,7 @@ model = genai.GenerativeModel('gemini-pro')
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
-    welcome_text = f"ሰላም {user_name}! 👋\nእኔ አሸፋ ቴክ AI ቦት ነኝ። እንዴት ልረዳህ እችላለሁ?"
+    welcome_text = f"ሰላም {user_name}! 👋\nእኔ Assefa's ቴክ AI ቦት ነኝ። እንዴት ልረዳህ እችላለሁ?"
     
     keyboard = [[InlineKeyboardButton("ስለ እኔ እወቅ", callback_data='about')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
